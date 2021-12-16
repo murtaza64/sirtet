@@ -20,7 +20,10 @@ class OrientedTetromino:
         self.width = max([lastindex(l, 1) for l in self._blocks]) + 1
 
     def __getitem__(self, slc):
-        return self._blocks[slc[1]][slc[0]]
+        try:
+            return self._blocks[slc[1]][slc[0]]
+        except IndexError:
+            return 0
 
     def __repr__(self):
         return f'OrientedTetromino({self.letter}, {self.orientation})'
@@ -35,6 +38,9 @@ class OrientedTetromino:
                 rs += render_block(self.letter if block else 0, skip_zeros=True)
             s += rs.rstrip() + '\n'
         return s[:-1]
+    
+    def __hash__(self):
+        return hash(self.letter + str(self.orientation))
 
     def offsets(self):
         return product(range(self.width), range(self.height))
