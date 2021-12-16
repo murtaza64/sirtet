@@ -1,4 +1,5 @@
 from itertools import zip_longest
+import curses
 
 
 class Colors:
@@ -25,6 +26,7 @@ block_colors = {
     'i': Colors.cyan
 }
 
+color_attrs = {}
 
 def colorize(s, color):
     return f'{Colors.prefix}{color}{s}{Colors.reset}'
@@ -35,6 +37,22 @@ def render_block(letter=0, empty=False, skip_zeros=False):
     if empty:
         return colorize('⬜', block_colors[letter])
     return colorize('⬛', block_colors[letter])
+
+def render_block_curses(letter, scr, y=None, x=None, 
+        autocolor=True, attrs=None, empty=False, skip_zeros=False):
+    att = 0
+    if autocolor:
+        att |= color_attrs[letter]
+    if attrs is not None:
+        att |= attrs
+    char = '⬜' if empty else '⬛'
+
+    if skip_zeros and not letter:
+        return scr.addstr('  ')
+    if x is not None and y is not None:
+        return scr.addstr(y, x, char, att)
+    return scr.addstr(char, att)
+
 
 FULLWIDTH_DELTA =  ord('Ａ') - ord('A')
 

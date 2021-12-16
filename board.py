@@ -1,11 +1,15 @@
 from itertools import product
-from lib import render_block
+from lib import render_block, render_block_curses
 from tetrominoes import Tetromino, OrientedTetromino
+import curses
 
 HEIGHT = 20
 WIDTH = 10
 
 class GameOver(Exception):
+    pass
+
+class IllegalMove(Exception):
     pass
 
 class TetrisBoard:
@@ -30,13 +34,18 @@ class TetrisBoard:
             s += '\n'
         return s[:-1]
 
+    def draw(self, scr):
+        for row in reversed(self._board):
+            for block in row:
+                render_block_curses(block, scr)
+            scr.addstr('\n')
+
     def can_descend(self, ot : OrientedTetromino, bx, by):
         for x, y in product(range(4), repeat=2):
             # print(self[x, y], board[bx + x, by + y - 1])
             if ot[x, y] and self[bx + x, by + y - 1]:
                 return False
         return True
-
 
     def place_tetromino(self, t : Tetromino, orientation, col):
         cur_y = HEIGHT
@@ -45,7 +54,11 @@ class TetrisBoard:
             cur_y -= 1
         if cur_y == HEIGHT:
             raise GameOver
-        for x, y in product(range(4), repeat=2):
+        for x, y in ot.offsets():
             if ot[x, y]:
+                if x >= WIDTH:
+                    raise IllegalMove
+                if y >= HEIGHT:
+                    raise GameOver
                 self._board[cur_y + y][col + x] = t.letter
         return cur_y
