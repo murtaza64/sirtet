@@ -10,9 +10,20 @@ class TetrisGameState:
     def __init__(self):
         self.score = 0
         self.board = TetrisBoard()
-        self.next_tet = random.choice(tetlist)
-        self.tet = random.choice(tetlist)
-    
+        self.tet_iq = list(range(7))
+        random.shuffle(self.tet_iq)
+        self.next_tet = tetlist[self.tet_iq.pop()]
+        self.tet = tetlist[self.tet_iq.pop()]
+
+    def next_tetromino(self):
+        self.tet = self.next_tet
+        try:
+            self.next_tet = tetlist[self.tet_iq.pop()]
+        except IndexError:
+            self.tet_iq = list(range(7))
+            random.shuffle(self.tet_iq)
+            self.next_tet = tetlist[self.tet_iq.pop()]
+
     def make_move(self, orient, col) -> 'tuple[TetrisBoard, int, list[int]]':
         self.board.place_tetromino(self.tet, orient, col)
         cleared = self.board.get_cleared_lines()
@@ -22,18 +33,16 @@ class TetrisGameState:
             self.board.remove_cleared_lines(cleared)
         else:
             reward = 0
-        self.tet = self.next_tet
-        self.next_tet = random.choice(tetlist)
+        self.next_tetromino()
         return old_board, reward, cleared
-        
+
 
 class TetrisGameRunner:
-    def __init__(self, board_win, cur_win, score_win, next_win, info_win, curses=True):
+    def __init__(self, board_win, cur_win, score_win, next_win, info_win):
         self.state = TetrisGameState()
         self.orient = 0
         self.col = 0
-        
-        self.curses = curses
+
         if curses:
             self.board_win = board_win
             self.cur_win = cur_win
@@ -42,13 +51,13 @@ class TetrisGameRunner:
             self.info_win = info_win
 
     def iteration(self):
-        self.board_win.clear()
+        # self.board_win.clear()
         self.state.board.draw(self.board_win)
         self.board_win.refresh()
-        
+
         self.draw_score()
         self.draw_next_tet()
-        
+
         self.orient = 0
         self.col = 4
         while True:
@@ -60,9 +69,9 @@ class TetrisGameRunner:
             self.state.board.preview(self.board_win, self.state.tet, self.orient, self.col)
             self.board_win.refresh()
 
-            if self.process_keypress():
+            if self.process_keypress() == ' ':
                 break
-        
+
         old_board, reward, cleared = self.state.make_move(self.orient, self.col)
         if cleared:
             self.celebrate(old_board, reward, cleared)
@@ -81,7 +90,9 @@ class TetrisGameRunner:
         ot = self.state.tet[self.orient]
         # logger.info(k)
         if k == ' ':
-            return True
+            return ' '
+        if k == 'r':
+            return 'r'
         if k in ['a', 'LEFT'] and self.col > 0:
             self.clear_board_preview()
             self.col -= 1
@@ -108,7 +119,7 @@ class TetrisGameRunner:
                 #check rotation
                 if ot.height < ot.width:
                     self.rotate()
-                self.col = WIDTH - ot.width
+                self.col = WIDTH - self.state.tet[self.orient].width
 
         return False
 
@@ -119,7 +130,7 @@ class TetrisGameRunner:
         rewardstr =  '+ ' + ' '*(4-len(scorestr)) + scorestr
         for _ in range(4):
             for idx in cleared:
-                old_board.draw_line(self.board_win, idx, curses.A_STANDOUT)
+                old_board.draw_line(self.board_win, idx, autocolor=False)
                 self.board_win.refresh()
             self.score_win.addstr(2, 0, rewardstr, curses.color_pair(6))
             self.score_win.refresh()
@@ -143,16 +154,44 @@ class TetrisGameRunner:
         self.state.next_tet[0].draw(self.next_win, 1, 0)
         self.next_win.refresh()
 
+    def draw_controls(self, start_x=0):
+        self.info_win.clear()
+        self.info_win.addstr(0, start_x+5, ' ⭮')
+        self.info_win.addstr(1, start_x+5, '[w]')
+        self.info_win.addstr(2, start_x, '<           >')
+        self.info_win.addstr(2, start_x+2, '[a]   [d]')
+        self.info_win.addstr(2, start_x+5, '[s]', curses.A_DIM)
+        self.info_win.addstr(3, start_x+3, '[space]')
+        self.info_win.addstr(4, start_x+6, '⭳')
+
+        self.info_win.addstr(1, start_x+20, 'instant column select')
+        self.info_win.addstr(2, start_x+23, '[z][x] ... [/]')
+        self.info_win.addstr(3, start_x+20, 'press again to rotate', curses.A_DIM)
+
+        self.info_win.addstr(5, start_x+10, '[q] open AI menu', curses.A_BLINK)
+
+        self.info_win.refresh()
+
     def game_over(self):
+        self.state.board.draw(self.board_win)
+        self.board_win.refresh()
+        curses.init_pair(10, curses.COLOR_BLACK, COLOR_MAP[self.state.tet.letter])
         self.info_win.clear()
         self.info_win.addstr(1, 10, ' '*WIDTH*2, curses.color_pair(10))
         self.info_win.addstr(2, 10, '    game over :(    ', curses.color_pair(10))
-        self.info_win.addstr(3, 10, f'    score: {self.state.score:06d}   ', curses.color_pair(10))
+        self.info_win.addstr(3, 10, f'    score {self.state.score:06d}    ', curses.color_pair(10))
         self.info_win.addstr(4, 10, ' '*WIDTH*2, curses.color_pair(10))
+        self.info_win.addstr(6, 10, '  [r] play again  ')
         self.info_win.refresh()
+        while True:
+            if self.process_keypress() == 'r':
+                self.state = TetrisGameState()
+                self.info_win.clear()
+                self.info_win.refresh()
+                return
 
     def run(self):
-        draw_controls(self.info_win)
+        self.draw_controls()
         #one iteration after which we clear controls
         self.iteration()
         self.info_win.clear()
@@ -162,8 +201,6 @@ class TetrisGameRunner:
                 self.iteration()
             except GameOver:
                 self.game_over()
-                self.cur_win.getkey()
-                return
 
 
 def eprint(*args, **kwargs):
@@ -182,9 +219,9 @@ def curses_init():
     curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_BLACK)
     curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_BLACK)
 
-    logger.info("number of colors: %s", curses.COLORS)
-    curses.init_color(9, 200, 300, 800)
-    curses.init_pair(9, 9, curses.COLOR_BLACK)
+    # logger.info("number of colors: %s", curses.COLORS)
+    # curses.init_color(9, 200, 300, 800)
+    # curses.init_pair(9, 9, curses.COLOR_BLACK)
     curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_BLUE)
 
     color_attrs[0] =  curses.color_pair(8) | curses.A_BOLD
@@ -203,25 +240,15 @@ BRACKET_MAP = {
     'D': 'LEFT'
 }
 COL_KEYS = 'zxcvbnm,./'
-
-def draw_controls(win, start_x=0):
-    win.clear()
-    win.addstr(0, start_x+5, ' ⭮')
-    win.addstr(1, start_x+5, '[w]')
-    win.addstr(2, start_x, '<           >')
-    win.addstr(2, start_x+2, '[a]   [d]')
-    win.addstr(2, start_x+5, '[s]', curses.A_DIM)
-    win.addstr(3, start_x+3, '[space]')
-    win.addstr(4, start_x+6, '⭳')
-
-    win.addstr(1, start_x+20, 'instant self.column select')
-    win.addstr(2, start_x+23, '[z][x] ... [/]')
-    win.addstr(3, start_x+20, 'press again to rotate', curses.A_DIM)
-    
-    win.addstr(5, start_x+10, '[q] open AI menu', curses.A_BLINK)
-
-    win.refresh()
-
+COLOR_MAP = {
+    'z': curses.COLOR_RED,
+    'l': curses.COLOR_YELLOW,
+    'o': curses.COLOR_YELLOW,
+    's': curses.COLOR_GREEN,
+    'j': curses.COLOR_BLUE,
+    't': curses.COLOR_MAGENTA,
+    'i': curses.COLOR_CYAN
+}
 
 def brackethandler(k, win):
     if k != '[':
@@ -257,7 +284,10 @@ def main(stdscr):
     next_win =  curses.newwin(5,      9,     4,     begin_x + width + 2)
     score_win = curses.newwin(3,      7,     4 + 5, begin_x + width + 2)
     logger.info("%d %d", info_begin_y, curses.LINES)
-    info_win =  curses.newwin(curses.LINES - info_begin_y, int(2.5*width), info_begin_y, info_begin_x)
+    info_win =  curses.newwin(curses.LINES - info_begin_y - 1, int(2.5*width), info_begin_y, info_begin_x)
+    bottom_row = curses.newwin(1, curses.COLS, curses.LINES-1, 0)
+    bottom_row.addstr('[ctrl][c] exit   [q] AI menu', curses.A_DIM)
+    bottom_row.refresh()
 
     runner = TetrisGameRunner(board_win, cur_win, score_win, next_win, info_win)
     runner.run()

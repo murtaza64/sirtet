@@ -45,21 +45,22 @@ class TetrisBoard:
         return ret
 
 
-    def draw_line(self, scr, idx, attrs):
+    def draw_line(self, scr, idx, attrs=0, autocolor=True):
         yi = HEIGHT - idx - 1
         x = 0
         row = self._board[idx]
         for block in row:
-            render_block_curses(block, scr, y=yi, x=x, attrs=attrs)
+            render_block_curses(block, scr, y=yi, x=x, 
+                    attrs=attrs, empty=not block, autocolor=autocolor)
             x += 2
 
     def preview(self, scr, tet : Tetromino, orient, col, remove=False):
         yi = HEIGHT - tet[orient].height - self.place_tetromino(tet, orient, col, dry_run=True)
         # self.draw(scr)
         if remove:
-            tet[orient].draw(scr, yi, col, color_attrs[0])
+            tet[orient].draw(scr, yi, col, color_attrs[0], empty=True)
         else:
-            tet[orient].draw(scr, yi, col, curses.A_STANDOUT)
+            tet[orient].draw(scr, yi, col, empty=True)
     
     def get_cleared_lines(self):
         clear_indexes = []

@@ -46,7 +46,8 @@ def render_block_curses(letter, scr, y=None, x=None,
         att |= color_attrs[letter]
     if attrs is not None:
         att |= attrs
-    char = '⬜' if empty else '⬛'
+    # char = '⬜' if empty else '⬛'
+    char = '⬜' if empty else '██'
 
     if skip_zeros and not letter:
         return scr.addstr('  ')
