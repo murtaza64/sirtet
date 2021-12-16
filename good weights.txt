@@ -1,0 +1,13 @@
+'n_features: 5'
+{}
+{}
+{<function row_count at 0x7f1c95d2a3a0>: -0.0102560526377865,
+ <function full_row at 0x7f1c95d2a430>: 35.87411657262815,
+ <function cur_col_height at 0x7f1c95d2a550>: -3.609725429992909,
+ <function n_new_holes at 0x7f1c95d2a5e0>: -0.0068101189059932565,
+ <function density at 0x7f1c95d2a790>: 45.03051613401426}
+{<function row_count at 0x7f1c95d2a3a0>: 0.15889812964802788,
+ <function full_row at 0x7f1c95d2a430>: 0.9425154566202677,
+ <function cur_col_height at 0x7f1c95d2a550>: 0.18774255637868567,
+ <function n_new_holes at 0x7f1c95d2a5e0>: 0.16858941519942255,
+ <function density at 0x7f1c95d2a790>: 0.15889812964802788}

@@ -76,6 +76,9 @@ class Tetromino:
 
     def __iter__(self):
         return iter(self.orientations)
+    
+    def __hash__(self):
+        return hash(self.letter)
 
     def n_orientations(self):
         return len(self.orientations)

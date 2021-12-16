@@ -49,7 +49,7 @@ class TetrisGameRunner:
     
     def ai_run(self):
         agent = TetrisQLearningAgent()
-        epochs = 10
+        epochs = 5
         iters = 100
         t = threading.Thread(target=self.trainer, args=(agent, epochs, iters))
         t.start()
