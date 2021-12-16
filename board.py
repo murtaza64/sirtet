@@ -1,10 +1,11 @@
-from itertools import product
-from lib import render_block, render_block_curses
-from tetrominoes import Tetromino, OrientedTetromino
 import curses
+from copy import deepcopy
+from lib import render_block, render_block_curses, color_attrs
+from tetrominoes import Tetromino, OrientedTetromino
 
 HEIGHT = 20
 WIDTH = 10
+SCORE_MAP = [0, 40, 100, 300, 1200]
 
 class GameOver(Exception):
     pass
@@ -34,31 +35,68 @@ class TetrisBoard:
             s += '\n'
         return s[:-1]
 
-    def draw(self, scr):
-        for row in reversed(self._board):
-            for block in row:
-                render_block_curses(block, scr)
-            scr.addstr('\n')
+    def draw(self, scr, attrs=0):
+        for i in range(HEIGHT):
+            self.draw_line(scr, i, attrs)
 
+    def copy(self):
+        ret = TetrisBoard()
+        ret._board = deepcopy(self._board)
+        return ret
+
+
+    def draw_line(self, scr, idx, attrs):
+        yi = HEIGHT - idx - 1
+        x = 0
+        row = self._board[idx]
+        for block in row:
+            render_block_curses(block, scr, y=yi, x=x, attrs=attrs)
+            x += 2
+
+    def preview(self, scr, tet : Tetromino, orient, col, remove=False):
+        yi = HEIGHT - tet[orient].height - self.place_tetromino(tet, orient, col, dry_run=True)
+        # self.draw(scr)
+        if remove:
+            tet[orient].draw(scr, yi, col, color_attrs[0])
+        else:
+            tet[orient].draw(scr, yi, col, curses.A_STANDOUT)
+    
+    def get_cleared_lines(self):
+        clear_indexes = []
+        for i, line in enumerate(self._board):
+            if all(line):
+                clear_indexes.append(i)
+        return clear_indexes
+
+    def remove_cleared_lines(self, clear_indexes):
+        #start clearing from the top so that indexes don't get messed up
+        for idx in reversed(clear_indexes):
+            del self._board[idx]
+            self._board.append([0 for x in range(WIDTH)])
+
+    @staticmethod 
+    def score(clear_indexes):
+        return SCORE_MAP[len(clear_indexes)]
+        
     def can_descend(self, ot : OrientedTetromino, bx, by):
-        for x, y in product(range(4), repeat=2):
+        for x, y in ot.offsets():
             # print(self[x, y], board[bx + x, by + y - 1])
             if ot[x, y] and self[bx + x, by + y - 1]:
                 return False
         return True
 
-    def place_tetromino(self, t : Tetromino, orientation, col):
+    def place_tetromino(self, t : Tetromino, orientation, col, dry_run=False):
         cur_y = HEIGHT
         ot = t[orientation]
         while cur_y > 0 and self.can_descend(ot, col, cur_y):
             cur_y -= 1
-        if cur_y == HEIGHT:
-            raise GameOver
+        if dry_run:
+            return cur_y
         for x, y in ot.offsets():
             if ot[x, y]:
-                if x >= WIDTH:
+                if col + x >= WIDTH:
                     raise IllegalMove
-                if y >= HEIGHT:
+                if cur_y + y >= HEIGHT:
                     raise GameOver
                 self._board[cur_y + y][col + x] = t.letter
         return cur_y

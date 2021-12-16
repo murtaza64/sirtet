@@ -1,5 +1,4 @@
 from itertools import zip_longest
-import curses
 
 
 class Colors:
@@ -40,6 +39,8 @@ def render_block(letter=0, empty=False, skip_zeros=False):
 
 def render_block_curses(letter, scr, y=None, x=None, 
         autocolor=True, attrs=None, empty=False, skip_zeros=False):
+    if y < 0 or x < 0:
+        return
     att = 0
     if autocolor:
         att |= color_attrs[letter]
@@ -56,8 +57,11 @@ def render_block_curses(letter, scr, y=None, x=None,
 
 FULLWIDTH_DELTA =  ord('Ａ') - ord('A')
 
-def fullwidth(c):
-    return chr(ord(c) + FULLWIDTH_DELTA)
+def fullwidth(s):
+    out = ''
+    for c in s:
+        out += chr(ord(c) + FULLWIDTH_DELTA)
+    return out
 
 def linewidth(s):
     total = 0

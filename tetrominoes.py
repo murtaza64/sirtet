@@ -36,17 +36,18 @@ class OrientedTetromino:
             s += rs.rstrip() + '\n'
         return s[:-1]
 
-    def offests(self):
+    def offsets(self):
         return product(range(self.width), range(self.height))
 
-    def draw(self, scr, yi, col):
+    def draw(self, scr, yi, col, attrs=0, empty=False, autocolor=True):
         x, y = 2*col, yi
         for row in reversed(self._blocks):
             if not any(row):
                 continue
             for block in row:
                 if block:
-                    render_block_curses(self.letter, scr, y, x)
+                    render_block_curses(self.letter, scr, y, x, 
+                            attrs=attrs, empty=empty, autocolor=autocolor)
                 x += 2
             y += 1
             x = 2*col
@@ -204,3 +205,5 @@ tetrominoes = {
         '''
     ], 'i')
 }
+
+tetlist = list(tetrominoes.values())
