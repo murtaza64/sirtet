@@ -41,11 +41,11 @@ class TetrisBoard:
     def place_tetromino(self, t : Tetromino, orientation, col):
         cur_y = HEIGHT
         ot = t[orientation]
-        while cur_y > 0 and ot.can_descend(self, col, cur_y):
+        while cur_y > 0 and self.can_descend(ot, col, cur_y):
             cur_y -= 1
         if cur_y == HEIGHT:
             raise GameOver
         for x, y in product(range(4), repeat=2):
             if ot[x, y]:
-                self._board[cur_y + y][x] = t.letter
+                self._board[cur_y + y][col + x] = t.letter
         return cur_y

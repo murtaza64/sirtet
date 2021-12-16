@@ -20,11 +20,11 @@ class OrientedTetromino:
         s = ''
         for row in reversed(self._blocks):
             rs = ''
+            if not any(row):
+                continue
             for block in row:
-                rs += render_block(self.letter if block else 0)
-            if not rs:
-                break
-            s += '\n'
+                rs += render_block(self.letter if block else 0, skip_zeros=True)
+            s += rs.rstrip() + '\n'
         return s[:-1]
 
 
@@ -42,6 +42,9 @@ class Tetromino:
 
     def __repr__(self):
         return f'Tetromino({self.letter})'
+
+    def __iter__(self):
+        return iter(self.orientations)
 
 
 
@@ -78,14 +81,100 @@ tetrominoes = {
         '''
         ....
         ....
-        .##.
         ##..
+        ##..
+        '''
+    ], 'o'),
+    'j': Tetromino([
+        '''
+        ....
+        .#..
+        .#..
+        ##..
+        ''',
+        '''
+        ....
+        ....
+        #...
+        ###.
+        ''',
+        '''
+        ....
+        ##..
+        #...
+        #...
+        ''',
+        '''
+        ....
+        ....
+        ###.
+        ..#.
+        '''
+    ], 'j'),
+    'l': Tetromino([
+        '''
+        ....
+        #...
+        #...
+        ##..
+        ''',
+        '''
+        ....
+        ....
+        ###.
+        #...
+        ''',
+        '''
+        ....
+        ##..
+        .#..
+        .#..
+        ''',
+        '''
+        ....
+        ....
+        ..#.
+        ###.
+        '''
+    ], 'l'),
+    't': Tetromino([
+        '''
+        ....
+        ....
+        .#..
+        ###.
         ''',
         '''
         ....
         #...
         ##..
+        #...
+        ''',
+        '''
+        ....
+        ....
+        ###.
+        .#..
+        ''',
+        '''
+        ....
+        .#..
+        ##..
         .#..
         '''
-    ], 's')
+    ], 't'),
+    'i': Tetromino([
+        '''
+        ....
+        ....
+        ....
+        ####
+        ''',
+        '''
+        #...
+        #...
+        #...
+        #...
+        '''
+    ], 'i')
 }
