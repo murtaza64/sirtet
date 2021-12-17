@@ -13,18 +13,20 @@ from learn import TetrisQLearningAgent
 
 
 class TetrisGameRunner:
-    def __init__(self, board_win, cur_win, score_win, next_win, info_win):
+    def __init__(self, board_win, cur_win, score_win, next_win, info_win, bottom_row, left_win):
         self.state = TetrisGameState()
         self.orient = 0
         self.col = 0
         self.info_queue = []
+        self.left_queue = []
 
-        if curses:
-            self.board_win = board_win
-            self.cur_win = cur_win
-            self.score_win = score_win
-            self.next_win = next_win
-            self.info_win = info_win
+        self.board_win = board_win
+        self.cur_win = cur_win
+        self.score_win = score_win
+        self.next_win = next_win
+        self.info_win = info_win
+        self.bottom_row = bottom_row
+        self.left_win = left_win
 
     def split_into_lines(self, s, length):
         ret = []
@@ -46,22 +48,35 @@ class TetrisGameRunner:
             self.info_win.addstr(i, 0, line)
         self.info_win.refresh()
 
+    def update_left(self, s):
+        h, w = self.left_win.getmaxyx()
+        lines = self.split_into_lines(s, w)
+        n = len(lines)
+        while len(self.left_queue) + n > h:
+            self.left_queue.pop(0)
+        self.left_queue += lines
+
+        self.left_win.clear()
+        for i, line in enumerate(self.left_queue):
+            self.left_win.addstr(i, 0, line)
+        self.left_win.refresh()
+
     
     def ai_run(self):
         agent = TetrisQLearningAgent()
-        epochs = 5
+        epochs = 35
         iters = 100
         t = threading.Thread(target=self.trainer, args=(agent, epochs, iters))
         t.start()
-        high_score = 0
+        self.high_score = 0
         while (t.is_alive()):
             # self.show_info(f'epoch {agent.n_epochs}')
             # agent.train(100)
             # self.show_info(f'training done: evaluating...')
             score, lines, moves = self.watch_ai_game(agent)
-            if score > high_score:
+            if score > self.high_score:
                 self.show_info(f'new high score: {score}, lines: {lines}, moves: {moves}')
-                high_score = score
+                self.high_score = score
         self.show_info('training done')
 
     def trainer(self, agent, epochs, iters):
@@ -69,12 +84,19 @@ class TetrisGameRunner:
         for i in range(epochs):
             self.show_info(f'epoch {agent.n_epochs}...')
             agent.train(iters)
+            self.show_info(f'weights = {list(agent.numeric_w.values())}')
 
-    def watch_ai_game(self, agent):
+    def watch_ai_game(self, agent : TetrisQLearningAgent):
         self.state = TetrisGameState()
         lines = 0
         moves = 0
 
+        self.left_queue = []
+        for f in agent.numeric_f_extrs:
+            self.update_left(f'{f.__name__}'
+                    + ' '*(20-len(f.__name__)) 
+                    + f'{agent.numeric_w[f]:04f}')
+            
 
         while True:
             self.orient = 0
@@ -82,7 +104,11 @@ class TetrisGameRunner:
             self.state.board.draw(self.board_win)
             self.board_win.refresh()
 
+
             self.draw_score()
+            self.score_win.addstr(3, 0, 'high:')
+            self.score_win.addstr(4, 0, f'{self.high_score:06d}')
+            self.score_win.refresh()
             self.draw_next_tet()
 
             ot : OrientedTetromino = self.state.tet[self.orient]
@@ -105,7 +131,6 @@ class TetrisGameRunner:
             moves += 1
             try:
                 old_board, reward, cleared = self.state.make_move(self.orient, self.col)
-                lines += len(cleared)
             except GameOver:
                 break
             if cleared:
@@ -132,6 +157,9 @@ class TetrisGameRunner:
         return score, lines, moves
 
     def ai_menu(self):
+        self.bottom_row.clear()
+        self.bottom_row.addstr(0, 0, '[ctrl][c] exit', curses.A_DIM)
+        self.bottom_row.refresh()
         self.ai_run()
         return False
 
@@ -260,7 +288,7 @@ class TetrisGameRunner:
         self.info_win.addstr(2, start_x+23, '[z][x] ... [/]')
         self.info_win.addstr(3, start_x+20, 'press again to rotate', curses.A_DIM)
 
-        self.info_win.addstr(5, start_x+10, '[q] open AI menu', curses.A_BLINK)
+        self.info_win.addstr(5, start_x+12, '[q] run sir tet AI', curses.A_BLINK)
 
         self.info_win.refresh()
 
@@ -374,14 +402,15 @@ def main(stdscr):
     board_win = curses.newwin(height, width, 4,     begin_x)
     cur_win =   curses.newwin(4,      width, 0,     begin_x)
     next_win =  curses.newwin(5,      9,     4,     begin_x + width + 2)
-    score_win = curses.newwin(3,      7,     4 + 5, begin_x + width + 2)
+    score_win = curses.newwin(6,      7,     4 + 5, begin_x + width + 2)
     logger.info("%d %d", info_begin_y, curses.LINES)
     info_win =  curses.newwin(curses.LINES - info_begin_y - 1, int(2.5*width), info_begin_y, info_begin_x)
     bottom_row = curses.newwin(1, curses.COLS, curses.LINES-1, 0)
-    bottom_row.addstr('[ctrl][c] exit   [q] AI menu', curses.A_DIM)
+    left_win = curses.newwin(height + 4, begin_x - 2, 1, 1)
+    bottom_row.addstr('[ctrl][c] exit   [q] run AI', curses.A_DIM)
     bottom_row.refresh()
 
-    runner = TetrisGameRunner(board_win, cur_win, score_win, next_win, info_win)
+    runner = TetrisGameRunner(board_win, cur_win, score_win, next_win, info_win, bottom_row, left_win)
     runner.run()
 
 if __name__ == '__main__':

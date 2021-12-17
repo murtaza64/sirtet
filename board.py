@@ -1,4 +1,4 @@
-import curses
+import itertools as it
 from copy import deepcopy
 from lib import render_block, render_block_curses, color_attrs
 from tetrominoes import Tetromino, OrientedTetromino
@@ -40,6 +40,7 @@ class TetrisBoard:
             self.draw_line(scr, i, attrs)
 
     def copy(self):
+        #pylint: disable=protected-access
         ret = TetrisBoard()
         ret._board = deepcopy(self._board)
         return ret
@@ -50,7 +51,7 @@ class TetrisBoard:
         x = 0
         row = self._board[idx]
         for block in row:
-            render_block_curses(block, scr, y=yi, x=x, 
+            render_block_curses(block, scr, y=yi, x=x,
                     attrs=attrs, empty=not block, autocolor=autocolor)
             x += 2
 
@@ -101,3 +102,13 @@ class TetrisBoard:
                     raise GameOver
                 self._board[cur_y + y][col + x] = t.letter
         return cur_y
+
+    def test_place_tetromino(self, t: Tetromino, orient, col):
+        board = self.copy()
+        yi = board.place_tetromino(t, orient, col)
+        cleared = board.get_cleared_lines()
+        board.remove_cleared_lines(cleared)
+        return board, yi, cleared
+
+    def coords(self):
+        return it.product(range(WIDTH), range(HEIGHT))

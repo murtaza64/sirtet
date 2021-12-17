@@ -3,9 +3,10 @@ from collections import defaultdict
 import random
 from pprint import pprint
 from board import GameOver, WIDTH, HEIGHT
+from lib import fullwidth
 from state import TetrisGameState
 
-def neighborhood(state: TetrisGameState, orient, col):
+def neighborhood(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     shape = []
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
@@ -18,7 +19,7 @@ def neighborhood(state: TetrisGameState, orient, col):
 
 
 # row shape after potential placement here
-def row_shape(state: TetrisGameState, orient, col):
+def row_shape(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     shape = [0 for x in range(WIDTH)]
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
@@ -30,7 +31,7 @@ def row_shape(state: TetrisGameState, orient, col):
             shape[col + dx] = 1
     return tuple(shape)
 
-def row_count(state: TetrisGameState, orient, col):
+def row_count(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     count = 0
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
@@ -40,25 +41,32 @@ def row_count(state: TetrisGameState, orient, col):
     for dx in range(ot.width):
         if ot[dx, 0]:
             count += 1
-    return (count/WIDTH)**12
+    return (count/WIDTH)**4
 
-def full_row(state: TetrisGameState, orient, col):
+def target_roughness(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
-    n = 0
+    shape = [0 for x in range(ot.width + 2)]
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
-    for dy in range(ot.height):
-        count = 0
-        for x in range(WIDTH):
-            if state.board[x, yi + dy]:
-                count += 1
-        for dx in range(ot.width):
-            if ot[dx, dy]:
-                count += 1
-        if count == WIDTH:
-            n += 1
-    return n
+    for dx in range(-1, ot.width + 1):
+        if col + dx < 0:
+            shape[dx + 1] = ot.height
+            continue
+        dy = 0
+        while dy < ot.height and not ot[dx, dy]:
+            dy += 1
+        while yi + dy >= 0 and not state.board[col + dx, yi + dy]:
+            dy -= 1
+        shape[dx + 1] = max(min(dy + 1, ot.height), -1)
+    return tuple(shape), ot
 
-def hspan_count(state: TetrisGameState, orient, col):
+
+def lines_cleared(state: TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 0
+    n = len(context['cleared'])
+    return [0, 40, 100, 300, 1200][n]/40
+
+def hspan_count(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     count = 0
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
@@ -71,7 +79,7 @@ def hspan_count(state: TetrisGameState, orient, col):
                 count += 1
     return (count/(ot.height*WIDTH))**12
 
-def cur_col_height(state: TetrisGameState, orient, col):
+def cur_col_height(state: TetrisGameState, orient, col, context):
     max_ = 0
     for y in range(0, HEIGHT):
         # consider any block in columns that the tetromino would occupy
@@ -80,11 +88,13 @@ def cur_col_height(state: TetrisGameState, orient, col):
     #try negating this?
     return max_/HEIGHT
 
-def n_new_holes(state: TetrisGameState, orient, col):
+def n_new_holes(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     holes = 0
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
-    if full_row(state, orient, col):
+    if context['gameover']:
+        return 0
+    if context['cleared']:
         return 0
     for dx, dy in it.product(range(-1, ot.width + 1), range(-1, ot.height)):
         if col + dx < 0 or WIDTH <= col + dx or yi + dy < 0:
@@ -94,12 +104,40 @@ def n_new_holes(state: TetrisGameState, orient, col):
                 if state.board[col + dx, yi + ty] or ot[dx, ty]:
                     holes += 1
                     break
-    return max(1, holes/2)
+    return max(1, holes/3)
 
-def no_new_holes(state: TetrisGameState, orient, col):
+def holes_per_block(state: TetrisGameState, orient, col, context):
+    holes = n_holes(state, orient, col, context)
+    blocks = n_blocks(state, orient, col, context)
+    return holes/blocks
+
+def n_blocks(state: TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 1
+    total = 1
+    board = context['dummy']
+    for x, y in board.coords():
+        if board[x, y]:
+            total += 1
+    return total/200
+
+def n_holes(state: TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 1
+    holes = 0
+    board = context['dummy']
+    for x, y in board.coords():
+        if not board[x, y]:
+            for ty in range(y + 1, HEIGHT):
+                if state.board[x, ty]:
+                    holes += 1
+                    break
+    return holes/200
+
+def no_new_holes(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     yi = state.board.place_tetromino(state.tet, orient, col, dry_run=True)
-    if full_row(state, orient, col):
+    if context['cleared']:
         return False
     for dx, dy in it.product(range(-1, ot.width + 1), range(-1, ot.height)):
         if col + dx < 0 or WIDTH <= col + dx or yi + dy < 0:
@@ -110,10 +148,10 @@ def no_new_holes(state: TetrisGameState, orient, col):
                     return True
     return False
 
-def tetromino_seq(state : TetrisGameState, orient, col):
+def tetromino_seq(state : TetrisGameState, orient, col, context):
     return state.tet[orient], state.next_tet
 
-def density(state: TetrisGameState, orient, col):
+def density(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
     nbhd_sz = (ot.width + 2) * (ot.height * 2)
     found_blocks = 0
@@ -121,38 +159,117 @@ def density(state: TetrisGameState, orient, col):
     for dx, dy in it.product(range(-1, ot.width + 1), range(-1, ot.height)):
         if yi + dy < 0:
             found_blocks += 1
-        if col + dx < 0 or WIDTH <= col + dx:
+        elif col + dx < 0 or WIDTH <= col + dx:
             nbhd_sz -= 1
         elif state.board[col + dx, yi + dy] or ot[dx, dy]:
             found_blocks += 1
     return found_blocks/nbhd_sz
 
+def adjacent(x, y):
+    yield x + 1, y
+    # yield x + 1, y + 1
+    yield x,     y + 1
+    # yield x - 1, y + 1
+    yield x - 1, y
+    # yield x - 1, y - 1
+    yield x,     y - 1
+    # yield x + 1, y - 1
+
+def surface_area(state: TetrisGameState, orient, col, context):
+    total = 0
+    if context['gameover']:
+        return 1
+    board = context['dummy']
+    for x, y in it.product(range(WIDTH), range(HEIGHT)):
+        if board[x, y]:
+            for ax, ay in adjacent(x, y):
+                if not 0 <= ax < WIDTH and 0 <= ay <= HEIGHT:
+                    continue
+                if not board[ax, ay]:
+                    total += 1
+    return total/200
+
+def board_total_height(state : TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 1
+    board = context['dummy']
+    total = 0
+    for x in range(WIDTH):
+        y = HEIGHT - 1
+        while not board[x, y] and y > 0:
+            y -= 1
+        total += y
+    return y/200
+
+def contact(state: TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 0
+    ot = state.tet[orient]
+    touching = 0
+    total = 0
+    yi = context['yi']
+    for dx, dy in ot.offsets():
+        if not ot[dx, dy]:
+            continue
+        for adx, ady in adjacent(dx, dy):
+            if ot[adx, ady]:
+                continue
+            ax = col + adx
+            ay = yi + ady
+            if ay >= yi + ot.height:
+                continue
+            if not 0 <= ax < WIDTH or ay < 0:
+                touching += 1
+            elif state.board[ax, ay]:
+                touching += 1
+            total += 1
+    return touching/total
+
+def zero(*args):
+    return 0
+
+def one(*args):
+    return 1
+
 class TetrisQLearningAgent:
     DISCOUNT = 0.9
-    LR_DECAY = 0.9999
+    LR_DECAY = defaultdict(lambda: 0.9999)
+    LR_DECAY.update({
+        lines_cleared: 0.99,
+        target_roughness: 0.95
+    })
     NUMERIC_LR = 1
     NUMERIC_LR_COUNT = 1
-    LR_HASHABLE_DECAY = {
-        neighborhood: 0.9,
-        row_shape: 0.9,
-        tetromino_seq: 0.999,
-    }
-    RANDOM_MOVE_CHANCE = 0.1
-    GAMEOVER_REWARD = -5
+
+    RANDOM_MOVE_CHANCE = 0.02
+    GAMEOVER_REWARD = -10
+    MOVE_REWARD = 0
     hashable_f_extrs = set()
     # {
-        # tetromino_seq,
-        # neighborhood,
-        # row_shape,
+        # target_roughness
+        # zero
     # }
+    INITIAL_WEIGHTS_NUMERIC = {
+        cur_col_height: -10,
+        n_holes: -1,
+        n_new_holes: -1,
+        density: 5,
+        row_count: 10,
+        lines_cleared: 40,
+        surface_area: -1,
+        board_total_height: -10
+    }
     numeric_f_extrs = {
         cur_col_height,
-        # n_new_holes,
-        n_new_holes,
-        density,
-        row_count,
-        full_row
-        # hspan_count,
+        # no_new_holes,
+        # n_holes,
+        # density,
+        # row_count,
+        lines_cleared,
+        contact,
+        holes_per_block,
+        # board_total_height
+        # surface_area
     }
 
     def __init__(self):
@@ -162,19 +279,17 @@ class TetrisQLearningAgent:
         self.all_f_extrs = set()
 
         self.hashable_lr = {f: defaultdict(lambda: 1) for f in self.hashable_f_extrs}
+        self.hashable_lr[target_roughness] = defaultdict(lambda: 0.5)
+
         self.hashable_w = {f: defaultdict(lambda: 0) for f in self.hashable_f_extrs}
+
         self.all_f_extrs |= self.hashable_f_extrs
 
+
         self.numeric_lr = {f: 1 for f in self.numeric_f_extrs}
-        self.numeric_w = {
-            cur_col_height: -10,
-            n_new_holes: -1,
-            density: 5,
-            row_count: 10,
-            full_row: 10
-            # hspan_count,
-        }
-        # self.numeric_w = {f: 0 for f in self.numeric_f_extrs}
+        self.numeric_w = dict(self.INITIAL_WEIGHTS_NUMERIC)
+        self.numeric_w = {f: 0 for f in self.numeric_f_extrs}
+
         self.all_f_extrs |= self.numeric_f_extrs
 
     def choose_action(self, state: TetrisGameState):
@@ -195,22 +310,38 @@ class TetrisQLearningAgent:
         if f in self.hashable_f_extrs:
             lr = self.hashable_lr[f][activation]
             self.hashable_w[f][activation] += delta * lr
-            with open('updates.txt', 'a') as fp:
-                print(f'weight update: {delta * lr}', file=fp)
-            self.hashable_lr[f][activation] *= self.LR_HASHABLE_DECAY[f]
+            self.hashable_lr[f][activation] *= self.LR_DECAY[f]
+
+            with open('info/updates.txt', 'a') as fp:
+                print(f'{f.__name__} weight update: {delta * lr}', file=fp)
 
         if f in self.numeric_f_extrs:
             lr = self.numeric_lr[f]
-            with open('updates.txt', 'a') as fp:
-                print(f'{f} weight update: {delta * lr * activation}', file=fp)
             self.numeric_w[f] += delta * lr * activation
             if activation:
-                self.numeric_lr[f] *= self.LR_DECAY
+                self.numeric_lr[f] *= self.LR_DECAY[f]
+            with open('info/updates.txt', 'a') as fp:
+                print(f'{f.__name__} weight update: {delta * lr * activation} (lr={lr}', file=fp)
 
-    def q_estimate(self, state, orient, col, fmap=None):
+
+    def q_estimate(self, state : TetrisGameState, orient, col, fmap=None):
         if fmap is None:
             fmap = dict()
-        fmap.update({f : f(state, orient, col) for f in self.all_f_extrs})
+        context = {}
+        try:
+            context['gameover'] = False
+            board, yi, cleared = state.board.test_place_tetromino(state.tet, orient, col)
+            context['dummy'] = board
+            context['cleared'] = cleared
+            context['yi'] = yi
+        except GameOver:
+            context['gameover'] = True
+
+        # b = state.board.copy()
+        # b.test_place_tetromino(state.tet, orient, col)
+        # context['uncleared_dummy'] = b
+
+        fmap.update({f : f(state, orient, col, context) for f in self.all_f_extrs})
         q = 0
         for f, activation in fmap.items():
             q += self.f_get_q_contribution(f, state, activation)
@@ -222,7 +353,7 @@ class TetrisQLearningAgent:
 
     def train(self, iters):
         #pylint: disable=unused-variable
-        with open('updates.txt', 'w') as fp:
+        with open('info/updates.txt', 'w') as fp:
             print(f'hello world!', file=fp)
         for _ in range(iters):
             state = TetrisGameState()
@@ -236,6 +367,7 @@ class TetrisQLearningAgent:
                 # get next state
                 try:
                     _, reward, cleared = state.make_move(orient, col)
+                    reward += self.MOVE_REWARD
                     q_best_next = max([self.q_estimate(state, *a) for a in state.get_moves()])
                 except GameOver:
                     gameover = True
@@ -246,7 +378,7 @@ class TetrisQLearningAgent:
 
                 # update weights
                 delta = reward + self.DISCOUNT * q_best_next - q_old
-                with open('updates.txt', 'a') as fp:
+                with open('info/updates.txt', 'a') as fp:
                     pprint(fmap, fp)
                     print(f'q_best_next ={q_best_next} q_old = {q_old}', file=fp)
                     print(f'delta: {delta}', file=fp)
@@ -259,7 +391,7 @@ class TetrisQLearningAgent:
                 n_moves += 1
 
             self.n_iterations += 1
-        with open(f'weights_epoch_{self.n_epochs}.txt', 'w') as f:
+        with open(f'info/weights_epoch_{self.n_epochs}.txt', 'w') as f:
             n_features = len(self.numeric_w) + sum(len(x) for x in self.hashable_w.values())
             pprint(f'n_features: {n_features}', f)
             pprint(self.hashable_w, f)
