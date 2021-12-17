@@ -64,7 +64,7 @@ def lines_cleared(state: TetrisGameState, orient, col, context):
     if context['gameover']:
         return 0
     n = len(context['cleared'])
-    return [0, 40, 100, 300, 1200][n]/40
+    return [-1e-3, 40, 100, 300, 1200][n]/40
 
 def hspan_count(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
@@ -109,12 +109,12 @@ def n_new_holes(state: TetrisGameState, orient, col, context):
 def holes_per_block(state: TetrisGameState, orient, col, context):
     holes = n_holes(state, orient, col, context)
     blocks = n_blocks(state, orient, col, context)
-    return holes/blocks
+    return (holes/blocks) / 20
 
 def n_blocks(state: TetrisGameState, orient, col, context):
     if context['gameover']:
         return 1
-    total = 1
+    total = 0
     board = context['dummy']
     for x, y in board.coords():
         if board[x, y]:
@@ -199,7 +199,35 @@ def board_total_height(state : TetrisGameState, orient, col, context):
         while not board[x, y] and y > 0:
             y -= 1
         total += y
-    return y/200
+    return total/200
+
+def height_per_block(state : TetrisGameState, orient, col, context):
+    if context['gameover']:
+        return 1
+    board = context['dummy']
+    blocks = n_blocks(state, orient, col, context)
+    total = 0
+    for x in range(WIDTH):
+        y = HEIGHT - 1
+        while not board[x, y] and y > 0:
+            y -= 1
+        total += y
+    return (total/(200*blocks)) / 20
+
+def relative_cur_col_height(state, orient, col, context):
+    if context['gameover']:
+        return 1
+    board = context['dummy']
+    ot = state.tet[orient]
+    heights = [0 for i in range(WIDTH)]
+    for x in range(WIDTH):
+        y = 0
+        while y < HEIGHT:
+            if board[x, y]:
+                heights[x] = y
+            y += 1
+    highest = max(list(range(ot.width)), key=lambda dx: heights[col + dx])
+    return int(heights[highest + col] - sum(heights)/WIDTH)/HEIGHT
 
 def contact(state: TetrisGameState, orient, col, context):
     if context['gameover']:
@@ -223,20 +251,20 @@ def contact(state: TetrisGameState, orient, col, context):
             elif state.board[ax, ay]:
                 touching += 1
             total += 1
-    return touching/total
+    return touching/total ** 2
 
-def zero(*args):
+def zero(*_):
     return 0
 
-def one(*args):
+def one(*_):
     return 1
 
 class TetrisQLearningAgent:
-    DISCOUNT = 0.9
-    LR_DECAY = defaultdict(lambda: 0.9999)
+    DISCOUNT = 0.95
+    LR_DECAY = defaultdict(lambda: 0.9996)
     LR_DECAY.update({
         lines_cleared: 0.99,
-        target_roughness: 0.95
+        target_roughness: 0.99
     })
     NUMERIC_LR = 1
     NUMERIC_LR_COUNT = 1
@@ -244,23 +272,29 @@ class TetrisQLearningAgent:
     RANDOM_MOVE_CHANCE = 0.02
     GAMEOVER_REWARD = -10
     MOVE_REWARD = 0
-    hashable_f_extrs = set()
-    # {
-        # target_roughness
+    hashable_f_extrs = {
+        # target_roughness,
+        # tetromino_seq
         # zero
-    # }
+    }
+    hashable_f_extrs = set()
     INITIAL_WEIGHTS_NUMERIC = {
-        cur_col_height: -10,
+        cur_col_height: 0,
+        relative_cur_col_height: -1,
         n_holes: -1,
         n_new_holes: -1,
         density: 5,
         row_count: 10,
         lines_cleared: 40,
         surface_area: -1,
-        board_total_height: -10
+        board_total_height: -10,
+        contact: 60,
+        holes_per_block: -1,
+        height_per_block: -1
     }
     numeric_f_extrs = {
-        cur_col_height,
+        # cur_col_height,
+        relative_cur_col_height,
         # no_new_holes,
         # n_holes,
         # density,
@@ -268,6 +302,7 @@ class TetrisQLearningAgent:
         lines_cleared,
         contact,
         holes_per_block,
+        height_per_block
         # board_total_height
         # surface_area
     }
@@ -278,7 +313,7 @@ class TetrisQLearningAgent:
 
         self.all_f_extrs = set()
 
-        self.hashable_lr = {f: defaultdict(lambda: 1) for f in self.hashable_f_extrs}
+        self.hashable_lr = {f: defaultdict(lambda: 0.9) for f in self.hashable_f_extrs}
         self.hashable_lr[target_roughness] = defaultdict(lambda: 0.5)
 
         self.hashable_w = {f: defaultdict(lambda: 0) for f in self.hashable_f_extrs}
@@ -288,7 +323,7 @@ class TetrisQLearningAgent:
 
         self.numeric_lr = {f: 1 for f in self.numeric_f_extrs}
         self.numeric_w = dict(self.INITIAL_WEIGHTS_NUMERIC)
-        self.numeric_w = {f: 0 for f in self.numeric_f_extrs}
+        # self.numeric_w = {f: 0 for f in self.numeric_f_extrs}
 
         self.all_f_extrs |= self.numeric_f_extrs
 

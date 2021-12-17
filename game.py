@@ -19,6 +19,7 @@ class TetrisGameRunner:
         self.col = 0
         self.info_queue = []
         self.left_queue = []
+        self.high_score = 0
 
         self.board_win = board_win
         self.cur_win = cur_win
@@ -77,6 +78,7 @@ class TetrisGameRunner:
             if score > self.high_score:
                 self.show_info(f'new high score: {score}, lines: {lines}, moves: {moves}')
                 self.high_score = score
+
         self.show_info('training done')
 
     def trainer(self, agent, epochs, iters):
