@@ -1,3 +1,4 @@
+#pylint:disable=unused-argument
 import itertools as it
 from collections import defaultdict
 import random
@@ -347,7 +348,7 @@ class TetrisQLearningAgent:
             self.hashable_w[f][activation] += delta * lr
             self.hashable_lr[f][activation] *= self.LR_DECAY[f]
 
-            with open('info/updates.txt', 'a') as fp:
+            with open('info/updates.txt', 'a', encoding='utf-8') as fp:
                 print(f'{f.__name__} weight update: {delta * lr}', file=fp)
 
         if f in self.numeric_f_extrs:
@@ -355,7 +356,7 @@ class TetrisQLearningAgent:
             self.numeric_w[f] += delta * lr * activation
             if activation:
                 self.numeric_lr[f] *= self.LR_DECAY[f]
-            with open('info/updates.txt', 'a') as fp:
+            with open('info/updates.txt', 'a', encoding='utf-8') as fp:
                 print(f'{f.__name__} weight update: {delta * lr * activation} (lr={lr}', file=fp)
 
 
@@ -381,15 +382,14 @@ class TetrisQLearningAgent:
         for f, activation in fmap.items():
             q += self.f_get_q_contribution(f, state, activation)
         return q
-    
+
     def get_best_move(self, state):
         moves = list(state.get_moves())
         return max(moves, key=lambda a: self.q_estimate(state, *a))
 
     def train(self, iters):
-        #pylint: disable=unused-variable
-        with open('info/updates.txt', 'w') as fp:
-            print(f'hello world!', file=fp)
+        # with open('info/updates.txt', 'w') as fp:
+        #     print(f'hello world!', file=fp)
         for _ in range(iters):
             state = TetrisGameState()
             gameover = False
@@ -401,19 +401,19 @@ class TetrisQLearningAgent:
 
                 # get next state
                 try:
-                    _, reward, cleared = state.make_move(orient, col)
+                    _, reward, _ = state.make_move(orient, col)
                     reward += self.MOVE_REWARD
                     q_best_next = max([self.q_estimate(state, *a) for a in state.get_moves()])
                 except GameOver:
                     gameover = True
                     # reward = min(self.GAMEOVER_REWARD + n_moves/4, -1)
                     reward = self.GAMEOVER_REWARD
-                    cleared = []
+                    # cleared = []
                     q_best_next = 0
 
                 # update weights
                 delta = reward + self.DISCOUNT * q_best_next - q_old
-                with open('info/updates.txt', 'a') as fp:
+                with open('info/updates.txt', 'a', encoding='utf-8') as fp:
                     pprint(fmap, fp)
                     print(f'q_best_next ={q_best_next} q_old = {q_old}', file=fp)
                     print(f'delta: {delta}', file=fp)
@@ -426,11 +426,11 @@ class TetrisQLearningAgent:
                 n_moves += 1
 
             self.n_iterations += 1
-        with open(f'info/weights_epoch_{self.n_epochs}.txt', 'w') as f:
+        with open(f'info/weights_epoch_{self.n_epochs}.txt', 'w', encoding='utf-8') as f:
             n_features = len(self.numeric_w) + sum(len(x) for x in self.hashable_w.values())
             pprint(f'n_features: {n_features}', f)
             pprint(self.hashable_w, f)
             pprint(self.hashable_lr, f)
-            pprint(self.numeric_w, f),
+            pprint(self.numeric_w, f)
             pprint(self.numeric_lr, f)
         self.n_epochs += 1

@@ -13,6 +13,10 @@ from learn import TetrisQLearningAgent
 
 
 class TetrisGameRunner:
+    '''
+    Accepts user input, interfaces with AI model and updates curses window
+    to either play a live game of tetris or demonstrate the AI
+    '''
     def __init__(self, board_win, cur_win, score_win, next_win, info_win, bottom_row, left_win):
         self.state = TetrisGameState()
         self.orient = 0
@@ -62,7 +66,7 @@ class TetrisGameRunner:
             self.left_win.addstr(i, 0, line)
         self.left_win.refresh()
 
-    
+
     def ai_run(self):
         agent = TetrisQLearningAgent()
         epochs = 35
@@ -70,7 +74,7 @@ class TetrisGameRunner:
         t = threading.Thread(target=self.trainer, args=(agent, epochs, iters))
         t.start()
         self.high_score = 0
-        while (t.is_alive()):
+        while t.is_alive():
             # self.show_info(f'epoch {agent.n_epochs}')
             # agent.train(100)
             # self.show_info(f'training done: evaluating...')
@@ -83,7 +87,7 @@ class TetrisGameRunner:
 
     def trainer(self, agent, epochs, iters):
         self.show_info(f'running {epochs} epochs of {iters} iterations')
-        for i in range(epochs):
+        for _ in range(epochs):
             self.show_info(f'epoch {agent.n_epochs}...')
             agent.train(iters)
             self.show_info(f'weights = {list(agent.numeric_w.values())}')
@@ -96,9 +100,9 @@ class TetrisGameRunner:
         self.left_queue = []
         for f in agent.numeric_f_extrs:
             self.update_left(f'{f.__name__}'
-                    + ' '*(20-len(f.__name__)) 
+                    + ' '*(20-len(f.__name__))
                     + f'{agent.numeric_w[f]:04f}')
-            
+
 
         while True:
             self.orient = 0
@@ -194,7 +198,7 @@ class TetrisGameRunner:
 
                 self.draw_score()
                 self.draw_next_tet()
-                
+
 
         old_board, reward, cleared = self.state.make_move(self.orient, self.col)
         if cleared:
