@@ -1,5 +1,5 @@
 from itertools import zip_longest
-
+import curses
 
 class Colors:
     prefix = "\033["
@@ -97,3 +97,36 @@ def horizontal_str(strings, sep=fullwidth('|')):
                 out += sep
         out += '\n'
     return out
+
+
+def brackethandler(k, win):
+    if k != '[':
+        return k
+    try:
+        return BRACKET_MAP[win.getkey()]
+    except KeyError:
+        return '['
+
+BRACKET_MAP = {
+    'A': 'UP',
+    'B': 'DOWN',
+    'C': 'RIGHT',
+    'D': 'LEFT'
+}
+
+def split_into_lines(s, length):
+    ret = []
+    while s:
+        ret.append(s[:length])
+        s = s[length:]
+    return ret
+
+CURSES_COLOR_MAP = {
+    'z': curses.COLOR_RED,
+    'l': curses.COLOR_YELLOW,
+    'o': curses.COLOR_YELLOW,
+    's': curses.COLOR_GREEN,
+    'j': curses.COLOR_BLUE,
+    't': curses.COLOR_MAGENTA,
+    'i': curses.COLOR_CYAN
+}

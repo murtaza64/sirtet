@@ -1,11 +1,14 @@
 #pylint:disable=unused-argument
 import itertools as it
 from collections import defaultdict
+from lib2to3.pytree import Base
+import logging
 import random
 from pprint import pprint
 from board import GameOver, WIDTH, HEIGHT
 from lib import fullwidth
 from state import TetrisGameState
+from base_agent import BaseTetrisAgent
 
 def neighborhood(state: TetrisGameState, orient, col, context):
     ot = state.tet[orient]
@@ -260,7 +263,10 @@ def zero(*_):
 def one(*_):
     return 1
 
-class TetrisQLearningAgent:
+class TetrisQLearningAgent(BaseTetrisAgent):
+
+    agent_name = 'Q learning agent (474)'
+
     DISCOUNT = 0.95
     LR_DECAY = defaultdict(lambda: 0.9996)
     LR_DECAY.update({
@@ -308,7 +314,7 @@ class TetrisQLearningAgent:
         # surface_area
     }
 
-    def __init__(self):
+    def __init__(self, logger):
         self.n_iterations = 0
         self.n_epochs = 0
 
@@ -327,6 +333,8 @@ class TetrisQLearningAgent:
         # self.numeric_w = {f: 0 for f in self.numeric_f_extrs}
 
         self.all_f_extrs |= self.numeric_f_extrs
+
+        self.logger = logger
 
     def choose_action(self, state: TetrisGameState):
         moves = list(state.get_moves())
@@ -384,13 +392,18 @@ class TetrisQLearningAgent:
         return q
 
     def get_best_move(self, state):
+        self.logger.log(logging.DEBUG, 'returning best move...')
         moves = list(state.get_moves())
-        return max(moves, key=lambda a: self.q_estimate(state, *a))
+        ret = max(moves, key=lambda a: self.q_estimate(state, *a))
+        self.logger.log(logging.DEBUG, 'returned best move')
+        return ret
 
     def train(self, iters):
         # with open('info/updates.txt', 'w') as fp:
         #     print(f'hello world!', file=fp)
         for _ in range(iters):
+            self.logger.log(logging.DEBUG, 'train step')
+
             state = TetrisGameState()
             gameover = False
             n_moves = 0
