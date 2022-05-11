@@ -33,6 +33,15 @@ class TetrisGameState:
         self.next_tetromino()
         return old_board, reward, cleared
 
+    def generate_move_context(self, orient, col) -> 'tuple[bool, TetrisBoard, int, list[int]]':
+        context = {}
+        try:
+            board, yi, cleared = self.board.test_place_tetromino(self.tet, orient, col)
+            return False, board, yi, cleared
+        except GameOver:
+            return True, None, None, None
+        return context
+
     def get_moves(self):
         for orient in range(self.tet.n_orientations()):
             for col in range(WIDTH):

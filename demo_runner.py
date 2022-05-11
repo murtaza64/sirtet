@@ -1,4 +1,7 @@
 import curses
+from datetime import datetime
+import json
+from pathlib import Path
 
 from state import TetrisGameState
 from board import WIDTH, HEIGHT, GameOver
@@ -9,7 +12,7 @@ class RunState:
     PLAYING = 0
     GAME_OVER = 1
 
-class TetrisGameRunner(Runner):
+class RecordDemonstrationsRunner(Runner):
 
     def __init__(self, ui : UserInterface):
         self.ui = ui
@@ -26,6 +29,7 @@ class TetrisGameRunner(Runner):
         self.ui.draw_next_tet(self.state.next_tet[0])
         self.ui.set_score(0, 0)
         self.ui.draw_placement_preview(self.state.board, self.state.tet, self.orient, self.col)
+        self.demonstrations = []
 
     def move_cur_tet(self, delta):
         ot = self.state.tet[self.orient]
@@ -48,6 +52,8 @@ class TetrisGameRunner(Runner):
     def place_cur_tet(self):
         # eroded = cumulative_wells(self.state, self.orient, self.col)
         # self.ui.push_text(f'{eroded} {self.col}')
+        self.demonstrations.append((self.state.board.copy(), self.state.tet, self.state.next_tet, self.orient, self.col))
+        self.ui.set_text(f'recorded demonstrations: {len(self.demonstrations)}', self.ui.LEFT)
         old_board, reward, cleared = self.state.make_move(self.orient, self.col)
         if cleared:
             self.ui.celebrate(old_board, reward, cleared)
@@ -63,11 +69,35 @@ class TetrisGameRunner(Runner):
     def game_over(self):
         if self.state.score > self.high_score:
             self.high_score = self.state.score
-        self.ui.set_score(self.state.score, self.high_score)
+            self.ui.set_score(self.state.score, self.high_score)
         self.ui.set_text('game over')
-        self.ui.push_text('[r] play again')
-        self.ui.push_text('[q] AI menu')
+        self.ui.push_text('[r] play again') 
+        self.ui.push_text('[f] save demonstrations')
+        self.ui.push_text('[q] open AI menu')
 
+    def demo_to_str(self, demo):
+        #pylint:disable=protected-access
+        board, tet, nt, orient, col = demo
+        boardints = []
+        for row in board._board:
+            bits = ''.join(['1' if c else '0' for c in row])
+            n = int(bits, base=2)
+            boardints.append(str(n))
+        return f'{"/".join(boardints)}|{tet.letter}|{nt.letter}:{orient},{col}\n'
+
+    def save_demonstrations(self):
+        processed_demos = [self.demo_to_str(demo) for demo in self.demonstrations]
+        Path('demonstrations').mkdir(exist_ok=True)
+        filename = f'demonstrations/{datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}.demo'
+        with Path(filename).open(mode='w', encoding='utf-8') as f:
+            f.writelines(processed_demos)
+        self.demonstrations = []
+        self.ui.set_text(f'demonstrations saved to {filename}')
+        if self.runstate == RunState.GAME_OVER:
+            self.ui.push_text('[r] play again ')
+            self.ui.push_text('[q] open AI menu')
+        self.ui.push_text('keep going or press [q] to open the AI menu')
+        self.ui.set_text(f'recorded demonstrations: {len(self.demonstrations)}', self.ui.LEFT)
 
     def handle_keypress(self, k):
         if k in ['q']:
@@ -101,6 +131,9 @@ class TetrisGameRunner(Runner):
                 self.ui.draw_cur_tet(self.state.tet[self.orient], self.col)
                 self.ui.draw_next_tet(self.state.next_tet[0])
                 self.ui.set_score(0, self.high_score)
+        
+        if k in ['f']:
+            self.save_demonstrations()
 
     def draw_controls(self, win, start_x=0):
         win.clear()
@@ -116,7 +149,8 @@ class TetrisGameRunner(Runner):
         # win.addstr(2, start_x+23, '[z][x] ... [/]')
         # win.addstr(3, start_x+20, 'press again to rotate', curses.A_DIM)
 
-        win.addstr(5, start_x+12, '[q] open sir tet AI menu', curses.A_BLINK)
+        win.addstr(5, start_x+12, '[q] open AI menu')
+        win.addstr(6, start_x+12, '[f] save demonstrations')
 
         win.refresh()
 

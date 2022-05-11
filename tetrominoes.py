@@ -69,7 +69,7 @@ class Tetromino:
             self.orientations.append(OrientedTetromino(s, i, letter))
 
     def __getitem__(self, slc) -> OrientedTetromino:
-        return self.orientations[slc]
+        return self.orientations[slc % len(self.orientations)]
 
     def __repr__(self):
         return f'Tetromino({self.letter})'

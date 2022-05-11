@@ -2,3 +2,7 @@
 info/
 *.out
 *.log
+*.data*
+*.index
+*/checkpoint
+demonstrations/*

@@ -1,4 +1,5 @@
-import curses, logging
+import curses
+import logging
 from time import sleep
 
 from board import WIDTH, HEIGHT, TetrisBoard
@@ -10,7 +11,7 @@ class UserInterface:
     LEFT = 0
     MIDDLE = 1
 
-    def __init__(self, board_win, cur_win, score_win, next_win, info_win, bottom_row, left_win, runner, logger=None):
+    def __init__(self, board_win, cur_win, score_win, next_win, info_win, bottom_row, left_win, runner, all_runners, logger=None):
         # self.state = TetrisGameState()
         # self.orient = 0
         # self.col = 0
@@ -34,8 +35,12 @@ class UserInterface:
         
         self.text_windows = [left_win, info_win]
         self.text_queues = [self.left_queue, self.info_queue]
-
+        self.all_runners = all_runners
         self.runner : Runner = runner(self)
+
+    def switch_runner(self, runner_id):
+        runner = self.all_runners[runner_id](self)
+        self.runner = runner
 
     def push_text(self, s : str, win_idx : int = MIDDLE):
         win = self.text_windows[win_idx]
@@ -45,16 +50,17 @@ class UserInterface:
         lines = split_into_lines(s, w)
         # n = len(lines)
         q += lines
-        while len(q) > h:
+        while len(q) >= h:
             q.pop(0)
 
-        if len(q) >= h:
-            q = q[:h-1]
+        # if len(q) >= h:
+        #     q = q[:h-1]
 
         win.clear()
         for i, line in enumerate(q):
             win.addstr(i, 0, line)
         win.refresh()
+        return i
 
     def set_text(self, s : str, win_idx : int = MIDDLE):
         win = self.text_windows[win_idx]
@@ -71,6 +77,19 @@ class UserInterface:
         for i, line in enumerate(q):
             win.addstr(i, 0, line)
         win.refresh()
+    
+    def get_str(self, prompt):
+        y = self.push_text(prompt + ': ')
+        curses.echo()
+        curses.curs_set(1)
+        s = self.info_win.getstr(y, len(prompt) + 2)
+        s = str(s, encoding='utf-8')
+        curses.noecho()
+        curses.curs_set(0)
+        # self.info_queue[-1] = self.info_queue[-1] + s
+        # self.info_queue.pop()
+        # self.info_queue.append(prompt + ': ' + s)
+        return s
 
     def clear_text(self, win_idx : int):
         self.text_queues[win_idx] = []
@@ -123,10 +142,12 @@ class UserInterface:
             self.score_win.refresh()
             sleep(0.1)
     
-    def set_score(self, score):
+    def set_score(self, score, high):
         self.score_win.clear()
         self.score_win.addstr('score:')
         self.score_win.addstr(1, 0, f'{score:06d}')
+        self.score_win.addstr(2, 0, 'high:')
+        self.score_win.addstr(3, 0, f'{high:06d}')
         self.score_win.refresh()
 
     def loop(self):

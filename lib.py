@@ -114,11 +114,13 @@ BRACKET_MAP = {
     'D': 'LEFT'
 }
 
-def split_into_lines(s, length):
+def split_into_lines(inp, length):
+    lines = inp.split('\n')
     ret = []
-    while s:
-        ret.append(s[:length])
-        s = s[length:]
+    for s in lines:
+        while s:
+            ret.append(s[:length])
+            s = s[length:]
     return ret
 
 CURSES_COLOR_MAP = {

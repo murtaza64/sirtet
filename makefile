@@ -7,5 +7,8 @@ tetris: *.py
 	@echo "make play        run the tetris simulator and AI framework (requires curses)"
 	@echo "                 (stderr from threads will be piped to stderr.out)"
 
-make play: *.py
-	python3 game.py 2> stderr.out
+play: *.py
+	python3 main.py 2> stderr.out
+
+test_env: *.py
+	python3 -i -c "from state import TetrisGameState; s=TetrisGameState()"
