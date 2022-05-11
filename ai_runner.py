@@ -46,7 +46,7 @@ agent_menu_item_name = {
 class AIRunner(Runner):
     
     installed_agents : 'list[tuple[BaseTetrisAgent, set]]' = [
-        (TetrisQLearningAgent,  {Options.TRAINABLE, Options.MONITOR}),
+        (TetrisQLearningAgent,  {Options.TRAINABLE}),
         (DellacherieAgent,      {}),
         (DeepQAgent,            {Options.TRAINABLE, Options.MONITOR, Options.SAVABLE}),
         (DeepQExpReplayAgent,   {Options.TRAINABLE, Options.MONITOR, Options.SAVABLE})

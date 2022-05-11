@@ -6,3 +6,5 @@ info/
 *.index
 */checkpoint
 demonstrations/*
+.ipynb_checkpoints/
+report.aux
